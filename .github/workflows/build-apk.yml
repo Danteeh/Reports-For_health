@@ -66,8 +66,10 @@ jobs:
             sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/' "$APP_GRADLE" || true
           fi
 
-          # Label de la app en el manifest
-          sed -i 's/android:label="reportes_jh"/android:label="Reportes J\&H"/' android/app/src/main/AndroidManifest.xml || true
+          # Label de la app en el manifest. OJO: en XML el '&' debe ir escapado
+          # como '&amp;' o el merge del manifest falla al parsear. En sed el
+          # '\&' produce un '&' literal, por eso escribimos '\&amp;'.
+          sed -i 's/android:label="reportes_jh"/android:label="Reportes J\&amp;H"/' android/app/src/main/AndroidManifest.xml || true
 
           echo "----- build.gradle resultante -----"
           cat "$APP_GRADLE"
