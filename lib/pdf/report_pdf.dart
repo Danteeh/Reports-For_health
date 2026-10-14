@@ -95,8 +95,11 @@ class ReportPdf {
   static pw.Widget _headerBlock() {
     return pw.Container(
       decoration: pw.BoxDecoration(border: _box),
-      child: pw.IntrinsicHeight(
-        child: pw.Row(
+      // El paquete pdf no tiene IntrinsicHeight. Para que las 3 columnas
+      // tengan la misma altura usamos una altura fija y CrossAxisAlignment
+      // .stretch; la mini-tabla de 3 filas cabe en ~56pt.
+      height: 56,
+      child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
             // col 1: logo
@@ -140,7 +143,6 @@ class ReportPdf {
             ),
           ],
         ),
-      ),
     );
   }
 
