@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:signature/signature.dart';
 
 import '../db/database.dart';
@@ -25,6 +26,27 @@ class _ReportEditorScreenState extends State<ReportEditorScreen> {
   late Report _r;
   bool _dirty = false;
 
+  /// Sugerencias de autocompletado por campo (valores ya usados + semillas).
+  final Map<String, List<String>> _suggestions = {};
+
+  /// Semillas iniciales: valores comunes para arrancar aunque no haya historial.
+  static const Map<String, List<String>> _seeds = {
+    'equipo': [
+      'Equipo de Onda de Choque',
+      'BTL-6000 Onda de Choque',
+      'Equipo de Terapia',
+    ],
+    'marca': ['BTL', 'Chattanooga', 'Enraf-Nonius'],
+    'clienteCiudad': [
+      'Bogota',
+      'Medellin',
+      'Cali',
+      'Barranquilla',
+      'Cartagena',
+      'Bucaramanga',
+    ],
+  };
+
   // Controladores de los campos de texto principales.
   final _controllers = <String, TextEditingController>{};
 
@@ -40,6 +62,46 @@ class _ReportEditorScreenState extends State<ReportEditorScreen> {
       penColor: Colors.black,
       exportBackgroundColor: Colors.white,
     );
+    _init();
+  }
+
+  Future<void> _init() async {
+    // Reporte nuevo: consecutivo automatico + fecha/hora de hoy.
+    if (widget.report == null) {
+      final consec = await _db.nextConsecutivo();
+      final now = DateTime.now();
+      if (!mounted) return;
+      setState(() {
+        _r.noReporte = consec;
+        _r.fecha = now;
+        _r.hora = DateFormat('HH:mm').format(now);
+      });
+    }
+    await _loadSuggestions();
+  }
+
+  Future<void> _loadSuggestions() async {
+    final fields = [
+      'clienteNombre',
+      'clienteCiudad',
+      'clienteSede',
+      'equipo',
+      'marca',
+      'modelo',
+    ];
+    final map = <String, List<String>>{};
+    for (final f in fields) {
+      final used = await _db.distinctValues(f);
+      final merged = <String>{...(_seeds[f] ?? const []), ...used}.toList()
+        ..sort();
+      map[f] = merged;
+    }
+    if (!mounted) return;
+    setState(() {
+      _suggestions
+        ..clear()
+        ..addAll(map);
+    });
   }
 
   TextEditingController _ctrl(String key, String initial) {
@@ -126,41 +188,38 @@ class _ReportEditorScreenState extends State<ReportEditorScreen> {
           padding: const EdgeInsets.all(12),
           children: [
             _sectionCard('Identificacion del reporte', [
-              _text('noReporte', 'No REPORTE', _r.noReporte,
-                  (v) => _r.noReporte = v),
+              _consecutivoField(),
+              const SizedBox(height: 8),
               Row(children: [
-                Expanded(
-                    child: _text('fechaDia', 'Dia', _r.fechaDia,
-                        (v) => _r.fechaDia = v,
-                        keyboard: TextInputType.number)),
+                Expanded(child: _datePickerField()),
                 const SizedBox(width: 8),
-                Expanded(
-                    child: _text('fechaMes', 'Mes', _r.fechaMes,
-                        (v) => _r.fechaMes = v,
-                        keyboard: TextInputType.number)),
-                const SizedBox(width: 8),
-                Expanded(
-                    child: _text('fechaAnio', 'Anio', _r.fechaAnio,
-                        (v) => _r.fechaAnio = v,
-                        keyboard: TextInputType.number)),
+                Expanded(child: _timePickerField()),
               ]),
-              _text('hora', 'Hora de reporte', _r.hora, (v) => _r.hora = v),
             ]),
             _bandCard('INFORMACION DEL CLIENTE', [
-              _text('cNombre', 'Nombre del Cliente', _r.clienteNombre,
-                  (v) => _r.clienteNombre = v),
-              _text('cCiudad', 'Ciudad', _r.clienteCiudad,
-                  (v) => _r.clienteCiudad = v),
-              _text('cSede', 'SEDE', _r.clienteSede,
-                  (v) => _r.clienteSede = v),
+              _autocompleteText('cNombre', 'Nombre del Cliente',
+                  _r.clienteNombre, (v) => _r.clienteNombre = v,
+                  field: 'clienteNombre'),
+              _autocompleteText('cCiudad', 'Ciudad', _r.clienteCiudad,
+                  (v) => _r.clienteCiudad = v,
+                  field: 'clienteCiudad'),
+              _autocompleteText(
+                  'cSede', 'SEDE', _r.clienteSede, (v) => _r.clienteSede = v,
+                  field: 'clienteSede'),
               _text('cTel', 'Telefono', _r.clienteTelefono,
                   (v) => _r.clienteTelefono = v,
                   keyboard: TextInputType.phone),
             ]),
             _bandCard('INFORMACION DEL EQUIPO', [
-              _text('equipo', 'EQUIPO', _r.equipo, (v) => _r.equipo = v),
-              _text('marca', 'Marca', _r.marca, (v) => _r.marca = v),
-              _text('modelo', 'MODELO', _r.modelo, (v) => _r.modelo = v),
+              _autocompleteText(
+                  'equipo', 'EQUIPO', _r.equipo, (v) => _r.equipo = v,
+                  field: 'equipo'),
+              _autocompleteText(
+                  'marca', 'Marca', _r.marca, (v) => _r.marca = v,
+                  field: 'marca'),
+              _autocompleteText(
+                  'modelo', 'MODELO', _r.modelo, (v) => _r.modelo = v,
+                  field: 'modelo'),
               const SizedBox(height: 4),
               const Text('Identificador:',
                   style: TextStyle(fontWeight: FontWeight.bold)),
@@ -323,6 +382,159 @@ class _ReportEditorScreenState extends State<ReportEditorScreen> {
         onChanged: (v) {
           onChanged(v);
           _markDirty();
+        },
+      ),
+    );
+  }
+
+  // --- Consecutivo (solo lectura, lo mantiene la app) ---
+  Widget _consecutivoField() {
+    return InputDecorator(
+      decoration: const InputDecoration(
+        labelText: 'No REPORTE (automatico)',
+        border: OutlineInputBorder(),
+        isDense: true,
+        prefixIcon: Icon(Icons.tag),
+      ),
+      child: Text(
+        _r.noReporte.isEmpty ? 'Asignando...' : _r.noReporte,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+      ),
+    );
+  }
+
+  // --- Fecha con DatePicker nativo ---
+  Widget _datePickerField() {
+    final label =
+        _r.fecha == null ? 'Seleccionar fecha' : DateFormat('dd/MM/yyyy').format(_r.fecha!);
+    return InkWell(
+      onTap: () async {
+        final now = DateTime.now();
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: _r.fecha ?? now,
+          firstDate: DateTime(now.year - 5),
+          lastDate: DateTime(now.year + 5),
+        );
+        if (picked != null) {
+          setState(() {
+            _r.fecha = picked;
+            _markDirty();
+          });
+        }
+      },
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'Fecha de reporte',
+          border: OutlineInputBorder(),
+          isDense: true,
+          prefixIcon: Icon(Icons.calendar_today, size: 18),
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+
+  // --- Hora con TimePicker nativo ---
+  Widget _timePickerField() {
+    return InkWell(
+      onTap: () async {
+        final parts = _r.hora.split(':');
+        final initial = TimeOfDay(
+          hour: int.tryParse(parts.isNotEmpty ? parts[0] : '') ??
+              TimeOfDay.now().hour,
+          minute: int.tryParse(parts.length > 1 ? parts[1] : '') ??
+              TimeOfDay.now().minute,
+        );
+        final picked =
+            await showTimePicker(context: context, initialTime: initial);
+        if (picked != null) {
+          setState(() {
+            _r.hora =
+                '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+            _markDirty();
+          });
+        }
+      },
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'Hora',
+          border: OutlineInputBorder(),
+          isDense: true,
+          prefixIcon: Icon(Icons.access_time, size: 18),
+        ),
+        child: Text(_r.hora.isEmpty ? 'Seleccionar hora' : _r.hora),
+      ),
+    );
+  }
+
+  // --- Campo de texto con autocompletado de valores ya usados + semillas ---
+  Widget _autocompleteText(
+    String key,
+    String label,
+    String initial,
+    ValueChanged<String> onChanged, {
+    required String field,
+  }) {
+    final options = _suggestions[field] ?? const <String>[];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Autocomplete<String>(
+        initialValue: TextEditingValue(text: initial),
+        optionsBuilder: (TextEditingValue value) {
+          final q = value.text.trim().toLowerCase();
+          if (q.isEmpty) return options;
+          return options.where((o) => o.toLowerCase().contains(q));
+        },
+        onSelected: (sel) {
+          onChanged(sel);
+          _markDirty();
+        },
+        fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+          // Mantener el texto inicial la primera vez que se construye.
+          if (controller.text.isEmpty && initial.isNotEmpty) {
+            controller.text = initial;
+          }
+          return TextField(
+            controller: controller,
+            focusNode: focusNode,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              isDense: true,
+              suffixIcon: options.isEmpty
+                  ? null
+                  : const Icon(Icons.arrow_drop_down, size: 20),
+            ),
+            onChanged: (v) {
+              onChanged(v);
+              _markDirty();
+            },
+          );
+        },
+        optionsViewBuilder: (context, onSelected, opts) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240, maxWidth: 320),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: opts.length,
+                  itemBuilder: (context, i) {
+                    final o = opts.elementAt(i);
+                    return ListTile(
+                      dense: true,
+                      title: Text(o),
+                      onTap: () => onSelected(o),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
         },
       ),
     );

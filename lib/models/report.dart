@@ -324,10 +324,19 @@ class Report {
 
   // Seccion 2: identificacion del reporte
   String noReporte;
-  String fechaDia;
-  String fechaMes;
-  String fechaAnio;
+
+  /// Fecha unica del reporte. Fuente de verdad del dia/mes/anio.
+  /// El PDF sigue leyendo fechaDia/Mes/Anio: esos getters se derivan de aqui.
+  DateTime? fecha;
+
   String hora;
+
+  // --- Compatibilidad con el PDF: dia/mes/anio como strings derivados ---
+  String get fechaDia =>
+      fecha == null ? '' : fecha!.day.toString().padLeft(2, '0');
+  String get fechaMes =>
+      fecha == null ? '' : fecha!.month.toString().padLeft(2, '0');
+  String get fechaAnio => fecha == null ? '' : fecha!.year.toString();
 
   // Seccion 3: informacion del cliente
   String clienteNombre;
@@ -364,9 +373,7 @@ class Report {
   Report({
     this.id,
     this.noReporte = '',
-    this.fechaDia = '',
-    this.fechaMes = '',
-    this.fechaAnio = '',
+    this.fecha,
     this.hora = '',
     this.clienteNombre = '',
     this.clienteCiudad = '',
@@ -407,6 +414,7 @@ class Report {
 
   Map<String, dynamic> toJson() => {
         'noReporte': noReporte,
+        'fecha': fecha?.toIso8601String(),
         'fechaDia': fechaDia,
         'fechaMes': fechaMes,
         'fechaAnio': fechaAnio,
@@ -434,6 +442,25 @@ class Report {
 
   String toJsonString() => jsonEncode(toJson());
 
+  /// Reconstruye la fecha: primero el campo ISO `fecha`, luego los strings
+  /// legacy dia/mes/anio de reportes guardados antes de este cambio.
+  static DateTime? _parseFecha(Map<String, dynamic> json) {
+    final iso = json['fecha'];
+    if (iso is String && iso.isNotEmpty) {
+      final d = DateTime.tryParse(iso);
+      if (d != null) return d;
+    }
+    final dia = int.tryParse((json['fechaDia'] ?? '').toString());
+    final mes = int.tryParse((json['fechaMes'] ?? '').toString());
+    final anio = int.tryParse((json['fechaAnio'] ?? '').toString());
+    if (dia != null && mes != null && anio != null) {
+      try {
+        return DateTime(anio, mes, dia);
+      } catch (_) {}
+    }
+    return null;
+  }
+
   factory Report.fromJson(Map<String, dynamic> json, {int? id}) {
     final checklistJson = (json['checklist'] as Map?) ?? {};
     final checklist = <String, ChecklistItemState>{};
@@ -458,9 +485,7 @@ class Report {
     return Report(
       id: id,
       noReporte: (json['noReporte'] ?? '').toString(),
-      fechaDia: (json['fechaDia'] ?? '').toString(),
-      fechaMes: (json['fechaMes'] ?? '').toString(),
-      fechaAnio: (json['fechaAnio'] ?? '').toString(),
+      fecha: _parseFecha(json),
       hora: (json['hora'] ?? '').toString(),
       clienteNombre: (json['clienteNombre'] ?? '').toString(),
       clienteCiudad: (json['clienteCiudad'] ?? '').toString(),

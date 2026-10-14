@@ -21,8 +21,12 @@ class ReportDatabase {
   static final ReportDatabase instance = ReportDatabase._();
 
   static const _dbName = 'reportes_jh.db';
-  static const _dbVersion = 1;
+  static const _dbVersion = 2;
   static const _table = 'reports';
+  static const _counters = 'counters';
+
+  /// Prefijo del consecutivo automatico. Formato final: MTNE-0001.
+  static const String consecutivoPrefix = 'MTNE-';
 
   Database? _db;
 
@@ -48,8 +52,79 @@ class ReportDatabase {
             data TEXT NOT NULL
           )
         ''');
+        await _createCounters(db);
+      },
+      onUpgrade: (db, oldV, newV) async {
+        if (oldV < 2) {
+          await _createCounters(db);
+        }
       },
     );
+  }
+
+  Future<void> _createCounters(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $_counters (
+        name TEXT PRIMARY KEY,
+        value INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.insert(
+      _counters,
+      {'name': 'reporte', 'value': 0},
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  /// Genera y RESERVA el siguiente consecutivo (atomico). Formato MTNE-0001.
+  /// Lo llama el editor solo al crear un reporte nuevo.
+  Future<String> nextConsecutivo() async {
+    final db = await database;
+    return db.transaction<String>((txn) async {
+      final rows = await txn.query(_counters,
+          where: 'name = ?', whereArgs: ['reporte'], limit: 1);
+      final current = rows.isEmpty ? 0 : (rows.first['value'] as int? ?? 0);
+      final next = current + 1;
+      await txn.update(_counters, {'value': next},
+          where: 'name = ?', whereArgs: ['reporte']);
+      return '$consecutivoPrefix${next.toString().padLeft(4, '0')}';
+    });
+  }
+
+  /// Valores distintos ya usados en un campo del modelo, para autocompletar.
+  /// `field` es la clave JSON (ej 'clienteNombre', 'marca', 'equipo').
+  Future<List<String>> distinctValues(String field) async {
+    final db = await database;
+    final rows = await db.query(_table, columns: ['data']);
+    final set = <String>{};
+    for (final row in rows) {
+      try {
+        final r = Report.fromJsonString(row['data'] as String);
+        final v = _fieldValue(r, field);
+        if (v != null && v.trim().isNotEmpty) set.add(v.trim());
+      } catch (_) {}
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  String? _fieldValue(Report r, String field) {
+    switch (field) {
+      case 'clienteNombre':
+        return r.clienteNombre;
+      case 'clienteCiudad':
+        return r.clienteCiudad;
+      case 'clienteSede':
+        return r.clienteSede;
+      case 'equipo':
+        return r.equipo;
+      case 'marca':
+        return r.marca;
+      case 'modelo':
+        return r.modelo;
+      default:
+        return null;
+    }
   }
 
   String _fecha(Report r) {
@@ -140,7 +215,7 @@ class ReportDatabase {
     original.id = null;
     original.createdAt = DateTime.now();
     original.updatedAt = DateTime.now();
-    original.noReporte = '${original.noReporte} (copia)';
+    original.noReporte = await nextConsecutivo();
     return insert(original);
   }
 
