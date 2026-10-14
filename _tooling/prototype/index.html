@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prototipo fidelidad - Reporte Mantenimiento J&amp;H</title>
+<style>
+  :root {
+    --accent: #FFC000;
+    --ink: #000;
+    --line: #000;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #525659;
+    font-family: Arial, Helvetica, sans-serif;
+    color: var(--ink);
+    padding: 24px;
+  }
+  .toolbar {
+    max-width: 816px;
+    margin: 0 auto 16px;
+    color: #fff;
+    font-size: 13px;
+  }
+  /* Carta: 612x792pt => a 96dpi, 816x1056px (1pt = 1.3333px). */
+  .page {
+    width: 816px;
+    min-height: 1056px;
+    margin: 0 auto 24px;
+    background: #fff;
+    padding: 24px;
+    font-size: 11px;
+  }
+  .thin { border: 1px solid var(--line); }
+  .band {
+    background: var(--accent);
+    border: 1px solid var(--line);
+    text-align: center;
+    font-weight: bold;
+    padding: 4px;
+    margin-top: 6px;
+    font-size: 12px;
+  }
+
+  /* Encabezado 3 columnas */
+  .header { display: flex; border: 1px solid var(--line); }
+  .header .logo { width: 210px; border-right: 1px solid var(--line); padding: 8px; display: flex; align-items: center; justify-content: center; }
+  .header .title { flex: 1; border-right: 1px solid var(--line); display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold; font-size: 16px; padding: 0 8px; }
+  .header .meta { width: 250px; display: flex; flex-direction: column; }
+  .header .meta .row { flex: 1; display: flex; border-bottom: 1px solid var(--line); }
+  .header .meta .row:last-child { border-bottom: 0; }
+  .header .meta .k { flex: 1; border-right: 1px solid var(--line); padding: 4px 8px; font-weight: bold; }
+  .header .meta .v { flex: 1; padding: 4px 8px; font-weight: bold; text-align: center; }
+
+  /* Logo vectorial (SVG) */
+  .logo svg { display: block; }
+  .logo .brand { color: var(--accent); font-weight: 800; font-size: 15px; text-align: center; }
+  .logo .nit { color: var(--accent); font-weight: 700; font-size: 9px; text-align: center; }
+
+  .proceso { border: 1px solid var(--line); border-top: 0; padding: 3px 6px; font-size: 11px; }
+
+  .reporte { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .reporte .noBox { width: 150px; height: 26px; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; }
+  .reporte .spacer { flex: 1; }
+  .fecha-cell { width: 40px; height: 22px; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; font-weight: bold; }
+  .hora-cell { width: 150px; height: 22px; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; }
+
+  .field { display: flex; align-items: center; gap: 6px; margin: 5px 0; }
+  .field label { font-weight: bold; white-space: nowrap; }
+  .field .val { flex: 1; border: 1px solid var(--line); height: 24px; display: flex; align-items: center; padding: 0 6px; }
+  .two { display: flex; gap: 16px; }
+  .two > * { flex: 1; }
+  .cb { display: inline-flex; width: 11px; height: 11px; border: 1px solid var(--line); align-items: center; justify-content: center; font-size: 9px; }
+
+  /* Filas checklist */
+  .checkwrap { border: 1px solid var(--line); border-top: 0; }
+  .checkrow { display: flex; align-items: center; border-top: 1px solid var(--line); padding: 3px 6px; min-height: 20px; }
+  .checkrow:first-child { border-top: 0; }
+  .checkrow .text { flex: 1; font-weight: bold; font-size: 11px; }
+  .checkrow .subs { color: #000; font-weight: normal; margin-left: 8px; }
+  .checkrow .sub u { padding: 0 10px; }
+  .marks { width: 190px; text-align: right; font-weight: bold; white-space: nowrap; }
+  .marks u { padding: 0 6px; }
+
+  /* Tabla repuestos */
+  table.rep { width: 100%; border-collapse: collapse; }
+  table.rep th, table.rep td { border: 1px solid var(--line); padding: 5px; font-size: 11px; }
+  table.rep th { text-align: center; }
+  table.rep td { height: 24px; }
+
+  .obs-line { border-bottom: 1px solid var(--line); min-height: 20px; text-align: center; font-weight: bold; padding: 4px 0; }
+  .obs-line.normal { font-weight: normal; }
+
+  .signatures { display: flex; gap: 24px; margin-top: 20px; }
+  .signatures > div { flex: 1; }
+  .sig-title { font-weight: bold; }
+  .sig-line { border-bottom: 1px solid var(--line); height: 28px; }
+  .apr-row { display: flex; align-items: flex-end; gap: 8px; margin-top: 10px; }
+  .apr-row label { font-weight: bold; width: 50px; }
+  .apr-row .ln { flex: 1; border-bottom: 1px solid var(--line); height: 20px; }
+  .footer { border-top: 2px solid #C00000; margin-top: 12px; padding-top: 4px; text-align: center; font-size: 10px; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    Prototipo de fidelidad (HTML/CSS a proporcion Carta 816x1056px @96dpi).
+    Comparar contra _tooling/ref/page1.png y page2.png. No forma parte de la app;
+    es solo una referencia visual para ajustar el PDF Dart.
+  </div>
+
+  <!-- ================= PAGINA 1 ================= -->
+  <div class="page">
+    <div class="header">
+      <div class="logo">
+        <div>
+          <svg width="180" height="30" viewBox="0 0 180 30">
+            <line x1="0" y1="16" x2="180" y2="16" stroke="#FFC000" stroke-width="1.5"/>
+            <polyline fill="none" stroke="#FFC000" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"
+              points="0,16 32,16 47,11 59,21 72,2 85,28 97,13 112,16 126,11 138,21 151,8 164,16 180,16"/>
+          </svg>
+          <div class="brand">J&amp;H EQUIPOS MEDICOS SAS</div>
+          <div class="nit">NIT. 901.933.809-3</div>
+        </div>
+      </div>
+      <div class="title">REPORTE DE MANTENIMIENTO PREVENTIVO</div>
+      <div class="meta">
+        <div class="row"><div class="k">Codigo</div><div class="v">MTNE-RG-01</div></div>
+        <div class="row"><div class="k">Version</div><div class="v">1</div></div>
+        <div class="row"><div class="k">Pagina</div><div class="v">1 de 1</div></div>
+      </div>
+    </div>
+    <div class="proceso"><b>Proceso:</b> Gestion Comercial</div>
+
+    <div class="reporte">
+      <b>No REPORTE:</b>
+      <div class="noBox">26-1109-3</div>
+      <div class="spacer"></div>
+      <div>
+        <div><b>Fecha de reporte :</b>
+          <span class="fecha-cell">11</span>
+          <span class="fecha-cell">9</span>
+          <span class="fecha-cell" style="width:52px">2026</span>
+        </div>
+        <div style="margin-top:4px"><b>Hora de Reporte :</b> <span class="hora-cell">:</span></div>
+      </div>
+    </div>
+
+    <div class="band">INFORMACION DEL CLIENTE</div>
+    <div style="padding:4px 0">
+      <div class="two">
+        <div class="field"><label>Nombre del Cliente:</label><div class="val">CIFEL</div></div>
+        <div class="field"><label>Ciudad:</label><div class="val">BOGOTA</div></div>
+      </div>
+      <div class="two">
+        <div class="field"><label>SEDE:</label><div class="val">SEDE PRINCIPAL CALLE 26</div></div>
+        <div class="field"><label>Telefono:</label><div class="val">3208199321</div></div>
+      </div>
+    </div>
+
+    <div class="band">INFORMACION DEL EQUIPO</div>
+    <div style="padding:4px 0">
+      <div class="two">
+        <div class="field"><label>EQUIPO:</label><div class="val">ONDA DE CHOQUE RADIAL</div></div>
+        <div class="field"><label>Marca:</label><div class="val">BTL</div></div>
+      </div>
+      <div class="field">
+        <label>MODELO:</label><div class="val" style="max-width:130px">BTL 6000 SWT</div>
+        <span style="margin-left:12px"><b>Serie</b> <span class="cb">X</span></span>
+        <span style="margin-left:10px"><b>Lote</b> <span class="cb"></span></span>
+        <span style="margin-left:10px"><b>Cod. Interno</b> <span class="cb"></span></span>
+        <span style="margin-left:10px"><b>No.:</b></span>
+        <div class="val" style="max-width:260px">04400B012485</div>
+      </div>
+    </div>
+
+    <div class="band">INFORMACION DEL CASO</div>
+    <div style="padding:6px 0">
+      <b>Modalidad de Servicio:</b>
+      <span style="margin-left:20px">Garantia <span class="cb"></span></span>
+      <span style="margin-left:18px">Contrato <span class="cb"></span></span>
+      <span style="margin-left:18px">Orden de trabajo <span class="cb">X</span></span>
+    </div>
+
+    <div id="checklist"></div>
+  </div>
+
+  <!-- ================= PAGINA 2 ================= -->
+  <div class="page">
+    <div class="band">REPUESTOS CAMBIADOS</div>
+    <table class="rep">
+      <thead>
+        <tr><th style="width:12%">Cantidad</th><th style="width:40%">Descripcion</th><th style="width:16%">Referencia</th><th>Observaciones</th></tr>
+      </thead>
+      <tbody>
+        <tr><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <div class="band" style="margin-top:16px">OBSERVACIONES GENERALES</div>
+    <div style="margin-top:10px">
+      <div class="obs-line">Equipo presenta desgaste fisico de los anillos del compresor se debe programar el cambio predictivo para evitar dano en las camisas</div>
+      <div class="obs-line">Se debe cambiar la electrovalvula de activacion del aplicador por alto desgaste fisico como predictivo</div>
+      <div class="obs-line">EQUIPO QUEDA FUNCIONANDO NORMAL Y CORRECTAMENTE</div>
+      <div class="obs-line normal">&nbsp;</div>
+    </div>
+
+    <div class="signatures">
+      <div>
+        <div class="sig-title">REPRESENTANTE MS MAINTENANCE SERVICE:</div>
+        <div style="height:42px"></div>
+        <div>Hugo Acosta R.</div>
+        <div>Cel.: 318 2380294</div>
+        <div>IP. 25387010170CND</div>
+        <div>REG. INVIMA RH-200906-502</div>
+      </div>
+      <div>
+        <div class="sig-title">APROBADO POR EL CLIENTE:</div>
+        <div class="apr-row"><label>Nombre:</label><div class="ln"></div></div>
+        <div class="apr-row"><label>Cargo:</label><div class="ln"></div></div>
+        <div class="apr-row"><label>Firma:</label><div class="ln" style="height:36px"></div></div>
+      </div>
+    </div>
+    <div class="footer">Se hace constar que el cliente acepta el servicio y es recibido a entera satisfaccion.</div>
+  </div>
+
+<script>
+  // Misma estructura configurable que lib/models/report.dart (kChecklistSections),
+  // para que el prototipo y la app no se desincronicen al eyeballear.
+  const SECTIONS = [
+    { title: "1. Inspeccion Visual", items: [
+      { text: "Integridad mecanica de la unidad y los accesorios para un uso seguro" },
+      { text: "Interruptor de voltaje funcional" },
+      { text: "Verificacion de los fusibles en la unidad" },
+      { text: "Chequeo de numeros de serie y versiones de firmware" },
+      { text: "Verificacion de estado de accesorios" },
+    ]},
+    { title: "2. RUTINA DE MANTENIMIENTO", items: [
+      { text: "Funcionalidad del LCD y luz de fondo" },
+      { text: "Funcionalidad de los botones" },
+      { text: "Funcionalidad de Alarmas audibles Visuales y Sonidos" },
+      { text: "Calibracion de panel tactil" },
+      { text: "Test de funcionamiento programacion verifiaccion de logs Error" },
+      { text: "Chequeo inicio de terapia Onda de Choque" },
+      { text: "Prueba de Compresion salida a aplicador", subs: ["1.5Brs:", "3Brs:", "4Brs:", "5Brs:"] },
+      { text: "Desarme y limpieza de camaras de compresion" },
+      { text: "Lubricacion de Rodamientos del Compresor" },
+      { text: "Verificacion estado mangueras" },
+      { text: "Drenaje de tanque de Reserva" },
+      { text: "Mantenimiento de Valvula Relief" },
+      { text: "Calibracion valvula Relief" },
+      { text: "limpieza de sistema de refrigeracion y extraccion de calor" },
+      { text: "Prueba Tiempo de Carga del Compresor a 5 Bar", subs: ["- 15 seg.", "- 20Seg.", "+ 20 Seg"] },
+      { text: "Conteo de Disparos de Trabajo Piston", subs: [""] },
+      { text: "Ajustes de carro y limpieza de ruedas" },
+      { text: "Verificacion de frenos carro" },
+      { text: "veriificacion de adaptador de voltaje y cable AC" },
+    ]},
+  ];
+
+  function marks() {
+    return '<span class="marks">N/A<u>&nbsp;&nbsp;&nbsp;</u> PASS<u>&nbsp;&nbsp;&nbsp;</u> FAIL<u>&nbsp;&nbsp;&nbsp;</u></span>';
+  }
+  function subs(list) {
+    return '<span class="subs">' + list.map(l =>
+      '<span class="sub">' + (l ? l + ' ' : '') + '<u>&nbsp;&nbsp;&nbsp;&nbsp;</u></span>'
+    ).join('&nbsp;&nbsp;') + '</span>';
+  }
+
+  const host = document.getElementById('checklist');
+  for (const s of SECTIONS) {
+    const band = document.createElement('div');
+    band.className = 'band';
+    band.textContent = s.title;
+    host.appendChild(band);
+    const wrap = document.createElement('div');
+    wrap.className = 'checkwrap';
+    for (const it of s.items) {
+      const row = document.createElement('div');
+      row.className = 'checkrow';
+      row.innerHTML =
+        '<span class="text">' + it.text + (it.subs ? subs(it.subs) : '') + '</span>' + marks();
+      wrap.appendChild(row);
+    }
+    host.appendChild(wrap);
+  }
+</script>
+</body>
+</html>

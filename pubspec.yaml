@@ -1,0 +1,25 @@
+name: reportes_jh
+description: Reportes de mantenimiento preventivo J&H Equipos Medicos SAS. Offline-first, SQLite, PDF de alta fidelidad.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.3.3+1
+  path_provider: ^2.1.4
+  path: ^1.9.0
+  pdf: ^3.11.1
+  printing: ^5.13.2
+  share_plus: ^10.0.2
+  signature: ^5.5.0
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
