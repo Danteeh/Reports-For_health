@@ -19,24 +19,64 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # Version de Flutter FIJA y conocida-buena. 3.27.x trae Gradle moderno y
+      # AGP 8.x, evitando tanto el error "Gradle < 8.14" como el de "AGP 9+ new
+      # DSL" que rompian el build anterior. No usar 'stable' flotante: una
+      # version nueva puede volver a introducir el salto a AGP 9.
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: "3.27.4"
+          cache: true
 
       - name: Flutter version
         run: flutter --version
 
-      # Genera los archivos de plataforma faltantes (iconos, archivos gradle del
-      # wrapper, etc.) SIN sobreescribir los ya versionados. El proyecto trae
-      # android/, pubspec.yaml y lib/ a mano; esto rellena solo lo que falte.
-      - name: Flutter create (rellenar plataforma Android)
-        run: flutter create --platforms=android --org com.jh .
+      # El repo NO versiona android/. Flutter lo genera completo y coherente con
+      # ESTA version de Flutter, asi nunca hay desajuste de Gradle/AGP.
+      - name: Generar plataforma Android
+        run: flutter create --platforms=android --org com.jh --project-name reportes_jh .
+
+      # Inyectar solo lo que nos importa sobre lo que Flutter genero:
+      #   - applicationId / namespace -> com.jh.reportes
+      #   - label de la app -> "Reportes J&H"
+      #   - firma release con la clave debug (APK instalable sin keystore)
+      - name: Personalizar Android (id, label, firma debug)
+        run: |
+          set -e
+          APP_GRADLE="android/app/build.gradle"
+          [ -f "android/app/build.gradle.kts" ] && APP_GRADLE="android/app/build.gradle.kts"
+          echo "Usando $APP_GRADLE"
+
+          # applicationId visible de instalacion -> com.jh.reportes.
+          # NO tocamos 'namespace': debe coincidir con el paquete del
+          # MainActivity.kt que genera flutter create (com.jh.reportes_jh), o el
+          # build falla. applicationId y namespace pueden diferir sin problema.
+          sed -i 's/applicationId = "com.jh.reportes_jh"/applicationId = "com.jh.reportes"/' "$APP_GRADLE" || true
+          sed -i 's/applicationId "com.jh.reportes_jh"/applicationId "com.jh.reportes"/' "$APP_GRADLE" || true
+
+          # Firma release con la clave debug: reemplazar la signingConfig del
+          # bloque release (Flutter la deja en signingConfigs.debug por defecto
+          # en el template moderno, pero lo forzamos por si acaso).
+          # DSL Kotlin (.kts): signingConfig = signingConfigs.getByName("debug")
+          if echo "$APP_GRADLE" | grep -q ".kts"; then
+            sed -i 's/signingConfig = signingConfigs.getByName("release")/signingConfig = signingConfigs.getByName("debug")/' "$APP_GRADLE" || true
+          else
+            sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/' "$APP_GRADLE" || true
+          fi
+
+          # Label de la app en el manifest
+          sed -i 's/android:label="reportes_jh"/android:label="Reportes J\&H"/' android/app/src/main/AndroidManifest.xml || true
+
+          echo "----- build.gradle resultante -----"
+          cat "$APP_GRADLE"
+          echo "----- manifest resultante -----"
+          cat android/app/src/main/AndroidManifest.xml
 
       - name: Flutter pub get
         run: flutter pub get
 
-      # Analisis NO bloqueante: reporta problemas pero no detiene el build.
       - name: Flutter analyze (no bloqueante)
         run: flutter analyze || true
 

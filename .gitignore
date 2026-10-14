@@ -8,11 +8,10 @@ pubspec.lock
 .metadata
 
 # Android
-android/local.properties
-android/.gradle/
-android/app/debug/
-android/app/profile/
-android/app/release/
+# El directorio android/ se GENERA en CI con `flutter create` para que la
+# version de Gradle/AGP siempre case con la version de Flutter del runner.
+# No se versiona a mano (evita el conflicto Gradle<8.14 / AGP9 que rompia CI).
+android/
 *.keystore
 *.jks
 key.properties
