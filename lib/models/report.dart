@@ -515,15 +515,15 @@ class Report {
 }
 
 /// ====================================================================
-/// Datos FIJOS del representante MS Maintenance Service (precarga).
+/// Datos FIJOS del ingeniero del area (precarga).
 /// Configurables en un solo lugar. `signaturePngAssetPath` es el path
 /// (asset o archivo) de la firma escaneada que se puede soltar luego.
 /// ====================================================================
 class RepresentanteConfig {
-  static const String nombre = 'Hugo Acosta R.';
-  static const String celular = 'Cel.: 318 2380294';
-  static const String ip = 'IP. 25387010170CND';
-  static const String regInvima = 'REG. INVIMA RH-200906-502';
+  static const String nombre = 'ANDRES CHAVEZ';
+  static const String celular = 'CEL. 3177663545';
+  static const String ip = 'COPNIA. 091030-9585CND';
+  static const String regInvima = 'REG. INVIMA RH-202007-00088';
 
   /// Ruta del PNG de la firma del representante. Si el archivo no existe,
   /// el PDF deja el espacio en blanco. Ver README para como reemplazarlo.
